@@ -1,7 +1,7 @@
 // App.tsx
 import React, { useEffect, useMemo, useState } from 'react';
 // eslint-disable-next-line max-len
-import { UserWarning } from '../../react_todo-app-loading-todos/src/UserWarning';
+import { UserWarning } from './UserWarning';
 import { createTodo, getTodos, updateTodos, USER_ID } from './api/todos';
 import { Todo } from './types/Todo';
 import { client } from './utils/fetchClient';
