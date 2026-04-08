@@ -54,7 +54,6 @@ export const App: React.FC = () => {
   const hasCompletedTodos = todos.some(t => t.completed);
 
   useEffect(() => {
-    // setLoadingAll(true);
     getTodos()
       .then(data => {
         if (!data) {
@@ -72,51 +71,47 @@ export const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!error) {
-      return;
+    if (error) {
+      const timer = setTimeout(() => setError(null), 3000);
+
+      return () => clearTimeout(timer);
     }
-
-    const timer = setTimeout(() => setError(null), 3000);
-
-    return () => clearTimeout(timer);
   }, [error]);
 
   const addTodo = async (title: string) => {
     const trimmed = title.trim();
 
-    if (!trimmed) {
+    if (trimmed) {
+      setError(null);
+
+      setLoading(prev => [...prev, 0]);
+
+      try {
+        const newTempTodo: Todo = {
+          id: 0,
+          title: trimmed,
+          userId: USER_ID,
+          completed: false,
+        };
+
+        setTempTodo(newTempTodo);
+
+        const created = await createTodo({
+          title: trimmed,
+          userId: USER_ID,
+          completed: false,
+        });
+
+        setTodos(prev => [...prev, created]);
+        setNewTitle('');
+      } catch (err) {
+        setError('Unable to add a todo');
+      } finally {
+        setLoading(prev => prev.filter(id => id !== 0));
+        setTempTodo(null);
+      }
+    } else {
       setError('Title should not be empty');
-
-      return;
-    }
-
-    setError(null);
-
-    setLoading(prev => [...prev, 0]);
-
-    try {
-      const newTempTodo: Todo = {
-        id: 0,
-        title: trimmed,
-        userId: USER_ID,
-        completed: false,
-      };
-
-      setTempTodo(newTempTodo);
-
-      const created = await createTodo({
-        title: trimmed,
-        userId: USER_ID,
-        completed: false,
-      });
-
-      setTodos(prev => [...prev, created]);
-      setNewTitle('');
-    } catch (err) {
-      setError('Unable to add a todo');
-    } finally {
-      setLoading(prev => prev.filter(id => id !== 0));
-      setTempTodo(null);
     }
   };
 
@@ -166,63 +161,59 @@ export const App: React.FC = () => {
   const deleteCompletedTodos = async () => {
     const ids = todos.filter(t => t.completed).map(t => t.id);
 
-    if (ids.length === 0) {
-      return;
-    }
+    if (ids.length > 0) {
+      setError(null);
+      setLoading(prev => [...prev, ...ids]);
 
-    setError(null);
-    setLoading(prev => [...prev, ...ids]);
+      try {
+        const results = await Promise.allSettled(
+          ids.map(id => client.delete(`/todos/${id}`)),
+        );
 
-    try {
-      const results = await Promise.allSettled(
-        ids.map(id => client.delete(`/todos/${id}`)),
-      );
+        const successfulIds = results
+          .map((result, idx) => {
+            if (result.status === 'fulfilled') {
+              return ids[idx];
+            }
 
-      const successfulIds = results
-        .map((result, idx) => {
-          if (result.status === 'fulfilled') {
-            return ids[idx];
-          }
+            return null;
+          })
+          .filter((id): id is number => id !== null);
 
-          return null;
-        })
-        .filter((id): id is number => id !== null);
+        setTodos(prev =>
+          prev.filter(t => !(t.completed && successfulIds.includes(t.id))),
+        );
 
-      setTodos(prev =>
-        prev.filter(t => !(t.completed && successfulIds.includes(t.id))),
-      );
+        const hasRejected = results.some(r => r.status === 'rejected');
 
-      const hasRejected = results.some(r => r.status === 'rejected');
-
-      if (hasRejected) {
+        if (hasRejected) {
+          setError('Unable to delete a todo');
+        }
+      } catch (err) {
         setError('Unable to delete a todo');
+      } finally {
+        setLoading(prev => prev.filter(lid => !ids.includes(lid)));
       }
-    } catch (err) {
-      setError('Unable to delete a todo');
-    } finally {
-      setLoading(prev => prev.filter(lid => !ids.includes(lid)));
     }
   };
 
   const onToggleAll = async () => {
-    if (todos.length === 0) {
-      return;
-    }
+    if (todos.length > 0) {
+      const shouldComplete = !allCompleted;
 
-    const shouldComplete = !allCompleted;
+      setError(null);
 
-    setError(null);
+      setLoading(prev => [...prev, ...todos.map(t => t.id)]);
 
-    setLoading(prev => [...prev, ...todos.map(t => t.id)]);
-
-    try {
-      await Promise.all(todos.map(t => updateTodo(t.id, shouldComplete)));
-    } catch {
-      setError("Can't update some todos");
-    } finally {
-      setLoading(prev =>
-        prev.filter(lid => !todos.map(t => t.id).includes(lid)),
-      );
+      try {
+        await Promise.all(todos.map(t => updateTodo(t.id, shouldComplete)));
+      } catch {
+        setError("Can't update some todos");
+      } finally {
+        setLoading(prev =>
+          prev.filter(lid => !todos.map(t => t.id).includes(lid)),
+        );
+      }
     }
   };
 
