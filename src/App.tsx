@@ -10,6 +10,7 @@ import { TodoList } from './components/TodoList';
 import { Footer } from './components/Footer';
 import { ErrorNotification } from './components/ErrorNotification';
 import { TodoItem } from './components/TodoItem';
+import { Errors } from './utils/enums/ErrorMessage';
 
 const FILTERS = {
   all: 'all' as const,
@@ -19,21 +20,17 @@ const FILTERS = {
 
 export const App: React.FC = () => {
   const [todos, setTodos] = useState<Todo[]>([]);
-  //Тайтл для створення нового туду
   const [newTitle, setNewTitle] = useState('');
-  //Тайтл для редактування вже створеного туду
   const [titleToSet, setTitleToSet] = useState('');
-  //Для задання ІД туду яке буде змінюватися
   const [selectedTodoId, setSelectedTodoId] = useState<number | null>(null);
-  //Тимчасовий туду до поки сервер не надасть відповідь
   const [tempTodo, setTempTodo] = useState<Todo | null>(null);
+  const allCompleted = todos.length > 0 && todos.every(t => t.completed);
+  const hasCompletedTodos = todos.some(t => t.completed);
   const [filter, setFilter] = useState<(typeof FILTERS)[keyof typeof FILTERS]>(
     FILTERS.all,
   );
   const [error, setError] = useState<string | null>(null);
-  //Для задання по ІД лоадерів
   const [loading, setLoading] = useState<number[]>([]);
-  //відфільтрований за фільтром туду лист який виводиться на екран
   const filteredTodos = useMemo(() => {
     switch (filter) {
       case 'active':
@@ -44,14 +41,10 @@ export const App: React.FC = () => {
         return todos;
     }
   }, [todos, filter]);
-  //Кількість яку залишилося відмітити зробленими
   const remainingCount = useMemo(
     () => todos.filter(t => !t.completed).length,
     [todos],
   );
-  //Стала для перевірки на всі виконані туду
-  const allCompleted = todos.length > 0 && todos.every(t => t.completed);
-  const hasCompletedTodos = todos.some(t => t.completed);
 
   useEffect(() => {
     getTodos()
@@ -63,10 +56,7 @@ export const App: React.FC = () => {
         setTodos(data);
       })
       .catch(() => {
-        setError('Unable to load todos');
-      })
-      .finally(() => {
-        // setLoadingAll(false);
+        setError(Errors.UTLT);
       });
   }, []);
 
@@ -105,13 +95,13 @@ export const App: React.FC = () => {
         setTodos(prev => [...prev, created]);
         setNewTitle('');
       } catch (err) {
-        setError('Unable to add a todo');
+        setError(Errors.UTAT);
       } finally {
         setLoading(prev => prev.filter(id => id !== 0));
         setTempTodo(null);
       }
     } else {
-      setError('Title should not be empty');
+      setError(Errors.TSNE);
     }
   };
 
@@ -140,7 +130,7 @@ export const App: React.FC = () => {
       setSelectedTodoId(null);
       setTitleToSet('');
     } catch {
-      setError("Can't update todo");
+      setError(Errors.CNUT);
     } finally {
       setLoading(prev => prev.filter(lid => lid !== id));
     }
@@ -152,7 +142,7 @@ export const App: React.FC = () => {
       await client.delete(`/todos/${id}`);
       setTodos(prev => prev.filter(t => t.id !== id));
     } catch (err) {
-      setError('Unable to delete a todo');
+      setError(Errors.UTDT);
     } finally {
       setLoading(prev => prev.filter(lid => lid !== id));
     }
@@ -187,10 +177,10 @@ export const App: React.FC = () => {
         const hasRejected = results.some(r => r.status === 'rejected');
 
         if (hasRejected) {
-          setError('Unable to delete a todo');
+          setError(Errors.UTDT);
         }
       } catch (err) {
-        setError('Unable to delete a todo');
+        setError(Errors.UTDT);
       } finally {
         setLoading(prev => prev.filter(lid => !ids.includes(lid)));
       }
@@ -208,7 +198,7 @@ export const App: React.FC = () => {
       try {
         await Promise.all(todos.map(t => updateTodo(t.id, shouldComplete)));
       } catch {
-        setError("Can't update some todos");
+        setError(Errors.CUST);
       } finally {
         setLoading(prev =>
           prev.filter(lid => !todos.map(t => t.id).includes(lid)),
